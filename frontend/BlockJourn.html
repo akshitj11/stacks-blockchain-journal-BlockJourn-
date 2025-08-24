@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlockJourn</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Stacks.js Libraries for Wallet and Blockchain Interaction -->
+    <script src="https://unpkg.com/@stacks/connect@7.8.0/dist/umd/index.umd.js"></script>
+    <script src="https://unpkg.com/@stacks/transactions@6.11.2/dist/umd/index.umd.js"></script>
+    <!-- Buffer polyfill for browser environment -->
+    <script>
+        var exports = {}; // A hack to make the buffer polyfill work
+    </script>
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .block {
+            transition: all 0.3s ease;
+        }
+        .block:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .hash-text {
+            word-break: break-all;
+        }
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-white">BlockJourn</h1>
+            <p class="text-gray-400 mt-2">Your decentralized crypto journal, secured by the Stacks blockchain.</p>
+            <div class="mt-6 text-center">
+                <button id="connectWalletBtn" class="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 transition">
+                    Connect Wallet
+                </button>
+                <div id="userInfo" class="hidden mt-2 text-xs text-gray-500">
+                    <span class="font-semibold">Connected:</span> <span id="userAddress"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Entry Creation Section (Initially hidden) -->
+        <div id="dapp-content" class="hidden">
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 border border-gray-700">
+                <h2 class="text-2xl font-semibold mb-4 text-white">New Entry</h2>
+                <textarea id="journalEntry" class="w-full p-3 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 transition placeholder-gray-400" rows="6" placeholder="Write your crypto insights..."></textarea>
+                <button id="addEntryBtn" class="mt-4 w-full bg-green-600 text-white font-semibold py-3 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 transition duration-300 ease-in-out flex items-center justify-center">
+                    <svg id="loadingSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Add Entry to Journal</span>
+                </button>
+            </div>
+
+            <!-- Journal Display Section -->
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold text-white">Your Journal</h2>
+            </div>
+            <div id="journalContainer" class="space-y-6">
+                 <div id="initialLoading" class="text-center py-10">
+                    <p class="text-gray-500">Connect your wallet to load your journal.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 max-w-sm w-full text-center border border-gray-700">
+            <div id="modalIcon"></div>
+            <h3 id="modalTitle" class="text-2xl font-bold mt-4"></h3>
+            <p id="modalMessage" class="text-gray-400 mt-2"></p>
+            <button id="closeModalBtn" class="mt-6 bg-indigo-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 transition">
+                Close
+            </button>
+        </div>
+    </div>
+    
+    <script type="module">
+        const { Buffer } = buffer; // Get Buffer from the polyfill
+
+        // Declare variables at the top level to be assigned later
+        let connect, showConnect, UserSession, StacksTestnet, stringUtf8CV, bufferCV, uintCV, cvToValue, callReadOnlyFunction, principalCV;
+        let network, appConfig, userSession;
+        
+        // --- CONFIGURATION ---
+        // IMPORTANT: Replace these placeholder values with your deployed contract address and name.
+        const contractAddress = "ST20XRM1VZF93XB4Y97K0RC32Z6HMR93TQQ9W1J8S.blockjourn"; 
+        const contractName = "blockjourn"; 
+
+        // --- UI ELEMENTS ---
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const userInfoDiv = document.getElementById('userInfo');
+        const userAddressSpan = document.getElementById('userAddress');
+        const dappContentDiv = document.getElementById('dapp-content');
+        const addEntryBtn = document.getElementById('addEntryBtn');
+        const journalContainer = document.getElementById('journalContainer');
+        const initialLoadingEl = document.getElementById('initialLoading');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        // --- APPLICATION LOGIC ---
+
+        /**
+         * Handles user authentication and session management.
+         */
+        function authenticate() {
+            showConnect({
+                appDetails: {
+                    name: 'BlockJourn',
+                    icon: window.location.origin + '/icon.png',
+                },
+                redirectTo: '/',
+                onFinish: () => {
+                    handleSession();
+                },
+                userSession,
+            });
+        }
+
+        /**
+         * Handles user sign-out.
+         */
+        function signOut() {
+            userSession.signUserOut('/');
+            handleSession();
+        }
+        
+        /**
+         * Manages UI state based on user session.
+         */
+        function handleSession() {
+            if (userSession.isUserSignedIn()) {
+                const userData = userSession.loadUserData();
+                userAddressSpan.textContent = userData.profile.stxAddress.testnet;
+                connectWalletBtn.textContent = 'Sign Out';
+                connectWalletBtn.onclick = signOut;
+                userInfoDiv.classList.remove('hidden');
+                dappContentDiv.classList.remove('hidden');
+                loadJournal();
+            } else {
+                userAddressSpan.textContent = '';
+                connectWalletBtn.textContent = 'Connect Wallet';
+                connectWalletBtn.onclick = authenticate;
+                userInfoDiv.classList.add('hidden');
+                dappContentDiv.classList.add('hidden');
+                journalContainer.innerHTML = '<p class="text-center text-gray-500">Connect your wallet to load your journal.</p>';
+            }
+        }
+
+        /**
+         * Fetches and renders the user's journal from the blockchain.
+         */
+        async function loadJournal() {
+            if (!userSession.isUserSignedIn()) return;
+            
+            initialLoadingEl.innerHTML = '<p class="text-gray-500">Loading your journal from the blockchain...</p>';
+            journalContainer.innerHTML = '';
+            journalContainer.appendChild(initialLoadingEl);
+
+            const userAddress = userSession.loadUserData().profile.stxAddress.testnet;
+
+            try {
+                // 1. Get total entry count
+                const countResponse = await callReadOnlyFunction({
+                    contractAddress,
+                    contractName,
+                    functionName: 'get-entry-count',
+                    functionArgs: [principalCV(userAddress)],
+                    network,
+                    senderAddress: userAddress,
+                });
+                const entryCount = cvToValue(countResponse);
+                
+                if (entryCount === 0) {
+                     initialLoadingEl.innerHTML = '<p class="text-center text-gray-500">Your journal is empty. Write your first entry!</p>';
+                     return;
+                }
+                
+                initialLoadingEl.remove();
+
+                // 2. Fetch each entry in reverse order
+                for (let i = entryCount; i > 0; i--) {
+                    const entryResponse = await callReadOnlyFunction({
+                        contractAddress,
+                        contractName,
+                        functionName: 'get-entry',
+                        functionArgs: [principalCV(userAddress), uintCV(i)],
+                        network,
+                        senderAddress: userAddress,
+                    });
+                    
+                    if (entryResponse) {
+                       const entryData = cvToValue(entryResponse);
+                       renderBlock(i, entryData);
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading journal:", error);
+                initialLoadingEl.innerHTML = '<p class="text-center text-red-500">Failed to load journal. Check if the contract address is correct and check the console.</p>';
+            }
+        }
+        
+        /**
+         * Renders a single journal block to the UI.
+         */
+        function renderBlock(index, data) {
+             const blockElement = document.createElement('div');
+             blockElement.className = 'block bg-gray-800 p-5 rounded-lg border border-gray-700';
+
+             const content = data.content;
+             const timestamp = new Date(data.timestamp * 1000).toLocaleString(); // Assuming timestamp is in seconds
+             const previousHash = `0x${Buffer.from(data['previous-hash']).toString('hex')}`;
+
+             blockElement.innerHTML = `
+                <div class="flex justify-between items-start text-sm text-gray-400 mb-3">
+                    <span class="font-bold text-lg text-indigo-400">Block #${index}</span>
+                    <span>Timestamp: ~Block ${data.timestamp}</span>
+                </div>
+                <div class="mb-4">
+                    <p class="text-gray-300 whitespace-pre-wrap">${content}</p>
+                </div>
+                <div class="bg-gray-900/50 p-3 rounded-md text-xs space-y-2">
+                    <div>
+                        <strong class="text-gray-400">Previous Hash:</strong>
+                        <p class="hash-text text-red-400">${previousHash}</p>
+                    </div>
+                </div>
+             `;
+             journalContainer.appendChild(blockElement);
+        }
+
+        /**
+         * Adds a new entry by calling the smart contract.
+         */
+        async function addNewEntry() {
+            const entryText = document.getElementById('journalEntry').value;
+            if (entryText.trim() === '') {
+                showInfoModal('Input Error', 'Journal entry cannot be empty.');
+                return;
+            }
+            
+            loadingSpinner.classList.remove('hidden');
+            addEntryBtn.disabled = true;
+
+            try {
+                // For simplicity, we'll use a dummy previous hash. A real dApp would calculate this.
+                const dummyPreviousHash = new Uint8Array(32); 
+                const dummyTimestamp = Math.floor(Date.now() / 1000); // Pass current time
+
+                const options = {
+                    contractAddress,
+                    contractName,
+                    functionName: 'add-entry',
+                    functionArgs: [
+                        stringUtf8CV(entryText),
+                        bufferCV(dummyPreviousHash),
+                        uintCV(dummyTimestamp), // Pass the timestamp
+                    ],
+                    appDetails: {
+                        name: 'BlockJourn',
+                        icon: window.location.origin + '/icon.png',
+                    },
+                    onFinish: (data) => {
+                        console.log('Transaction finished:', data);
+                        showInfoModal('Success', 'Your entry was successfully submitted! It will appear after the next block is confirmed.');
+                        document.getElementById('journalEntry').value = '';
+                        loadingSpinner.classList.add('hidden');
+                        addEntryBtn.disabled = false;
+                        // We don't reload the journal immediately, as we need to wait for block confirmation.
+                    },
+                    onCancel: () => {
+                         showInfoModal('Cancelled', 'The transaction was cancelled.');
+                         loadingSpinner.classList.add('hidden');
+                         addEntryBtn.disabled = false;
+                    }
+                };
+                await connect.openContractCall(options);
+
+            } catch (error) {
+                console.error("Error adding entry:", error);
+                showInfoModal('Error', 'There was an error submitting your transaction.');
+                loadingSpinner.classList.add('hidden');
+                addEntryBtn.disabled = false;
+            }
+        }
+        
+        /**
+         * Shows a generic info modal.
+         */
+        function showInfoModal(title, message) {
+            const modal = document.getElementById('infoModal');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        // --- EVENT LISTENERS ---
+        addEntryBtn.addEventListener('click', addNewEntry);
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            document.getElementById('infoModal').classList.add('hidden');
+        });
+        
+        // --- INITIALIZATION ---
+        function initializeApp() {
+            if (window.StacksConnect && window.StacksTransactions) {
+                // Libraries are loaded, proceed with initialization
+                ({ connect, showConnect, UserSession } = window.StacksConnect);
+                ({ StacksTestnet } = window.StacksTransactions);
+                ({
+                    stringUtf8CV,
+                    bufferCV,
+                    uintCV,
+                    cvToValue,
+                    callReadOnlyFunction,
+                    principalCV
+                } = window.StacksTransactions);
+
+                // Initialize objects that depend on the loaded scripts
+                network = new StacksTestnet();
+                appConfig = new connect.AppConfig(['store_write', 'publish_data']);
+                userSession = new UserSession({ appConfig });
+
+                // Now that everything is initialized, run the app logic
+                handleSession();
+            } else {
+                // Libraries not loaded yet, wait 100ms and retry
+                setTimeout(initializeApp, 100);
+            }
+        }
+        
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
