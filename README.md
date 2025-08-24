@@ -30,8 +30,8 @@ Smart Contract: Stacks Testnet, the public testing network for the Stacks blockc
 
 
 **smart contract address (deployed on testnet,using stacks explorer) **
-    ST20XRM1VZF93XB4Y97K0RC32Z6HMR93TQQ9W1J8S
-    contract name - block journ
+    ST20XRM1VZF93XB4Y97K0RC32Z6HMR93TQQ9W1J8S.blockjourn
+    contract name - blockjourn
 
 
 how to use? you have to connect your wallet(leather) and start journal
