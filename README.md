@@ -1,4 +1,4 @@
-i have created this website called 'BlockJour', it is basically ka journal site for crypto enthusiasts to note their key insight abotut their portfolio and future investements.
+i have created this website called 'BlockJourn', it is basically ka journal site for crypto enthusiasts to note their key insight abotut their portfolio and future investements.
 
 
 **tech stack used:**
