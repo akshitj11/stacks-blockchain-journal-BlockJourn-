@@ -35,3 +35,9 @@ Smart Contract: Stacks Testnet, the public testing network for the Stacks blockc
 
 
 how to use? you have to connect your wallet(leather) and start journal
+
+
+
+
+<img width="1360" height="757" alt="image" src="https://github.com/user-attachments/assets/8ea00e5b-5ca4-479b-8e31-b626e0341cbf" />
+
