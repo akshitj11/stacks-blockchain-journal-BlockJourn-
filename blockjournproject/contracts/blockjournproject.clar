@@ -1,17 +1,4 @@
-;; ---------------------------------------------------------
-;; BlockJourn Smart Contract
-;;
-;; This contract allows users to store immutable journal
-;; entries on the Stacks blockchain. Each entry is linked
-;; to the user's principal (their blockchain address).
-;; ---------------------------------------------------------
 
-;; --- Data Storage ---
-
-;; This map stores the actual journal entries.
-;; The key is a tuple containing the owner's address and the entry's index number.
-;; The value is a tuple containing the entry's content, the block-height (as a timestamp),
-;; and the hash of the previous entry.
 (define-map journal
   (tuple (owner principal) (index uint))
   (tuple
@@ -21,8 +8,7 @@
   )
 )
 
-;; This map tracks how many entries each user has.
-;; The key is the user's principal, and the value is their total entry count.
+
 (define-map user-entry-count principal uint)
 
 ;; --- Constants and Errors ---
