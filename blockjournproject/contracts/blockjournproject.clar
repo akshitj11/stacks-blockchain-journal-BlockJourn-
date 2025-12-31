@@ -2,9 +2,9 @@
 (define-map journal
   (tuple (owner principal) (index uint))
   (tuple
-    (content (string-utf8 1024)) ;; Allows entries up to 1024 characters
+    (content (string-utf8 1024)) 
     (timestamp uint)
-    (previous-hash (buff 32))   ;; A 32-byte buffer for a SHA256 hash
+    (previous-hash (buff 32))   
   )
 )
 
@@ -17,8 +17,7 @@
 
 ;; --- Public Functions (Callable by users) ---
 
-;; Adds a new journal entry for the user calling the function.
-;; The timestamp is now passed in as an argument to satisfy the checker.
+
 (define-public (add-entry (content (string-utf8 1024)) (previous-hash (buff 32)) (timestamp uint))
   (let
     (
@@ -40,7 +39,7 @@
   )
 )
 
-;; --- Read-Only Functions (Viewable by anyone without a transaction) ---
+
 
 ;; Retrieves a specific journal entry for a given owner and index.
 (define-read-only (get-entry (owner principal) (index uint))
@@ -52,7 +51,7 @@
   (ok (get-entry-count-internal owner))
 )
 
-;; --- Internal Helper Functions ---
+
 
 ;; A private helper to get a user's entry count, returning u0 if they have none.
 (define-private (get-entry-count-internal (owner principal))
